@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+# GitHub Pages へのデプロイ権限を追加
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
