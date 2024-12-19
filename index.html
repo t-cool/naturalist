@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Naturalist Memo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #444;
+        }
+
+        #address {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.2em;
+        }
+
+        input[type="text"] {
+            display: block;
+            margin: 10px auto;
+            padding: 10px;
+            width: 80%;
+            max-width: 400px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        table {
+            width: 90%;
+            max-width: 800px;
+            margin: 20px auto;
+            border-collapse: collapse;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        td button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        td button:hover {
+            background-color: #c82333;
+        }
+
+        /* レスポンシブデザイン */
+        @media (max-width: 600px) {
+            input[type="text"], button {
+                width: 90%;
+                max-width: none;
+            }
+
+            table {
+                width: 100%;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Naturalist Memo</h1>
+    <p id="address">住所を取得中...</p>
+    <input type="text" id="memo" placeholder="メモを入力">
+    <div class="button-container">
+        <button id="saveButton">保存</button>
+        <button id="exportButton">データをエクスポート</button>
+    </div>
+    <h2>履歴</h2>
+    <table id="history">
+        <thead>
+            <tr>
+                <th>時刻</th>
+                <th>住所</th>
+                <th>メモ</th>
+                <th>更新</th>
+                <th>削除</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <script>
+        // 現在地の取得
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
+        } else {
+            document.getElementById('address').textContent = 'このブラウザでは位置情報が利用できません。';
+        }
+
+        function successCallback(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            const endpoint = 'https://nominatim.openstreetmap.org/reverse';
+            const params = new URLSearchParams({
+                lat: lat,
+                lon: lng,
+                format: 'json',
+                'accept-language': 'ja'
+            });
+
+            const url = `${endpoint}?${params.toString()}`;
+
+            const historyTableBody = document.getElementById('history').getElementsByTagName('tbody')[0];
+
+            // オンラインかどうかをチェック
+            const isOnline = navigator.onLine;
+
+            if (isOnline) {
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        // 住所のフォーマットを変更
+                        const addressParts = data.display_name.split(',').map(part => part.trim());
+                        const address = addressParts.slice(0, -2).reverse().join(''); // 郵便番号と日本を削除し、順序を逆に
+
+                        document.getElementById('address').textContent = address; // 「住所:」を削除
+
+                        // 保存ボタンのイベントリスナーを設定
+                        setUpSaveButton(address, lat, lng);
+                    })
+                    .catch(error => {
+                        console.error('エラー:', error);
+                        document.getElementById('address').textContent = '住所の取得に失敗しました。';
+                        // オフライン時の処理
+                        setUpSaveButton(null, lat, lng);
+                    });
+            } else {
+                document.getElementById('address').textContent = 'オフラインです。住所は後で取得できます。';
+                // オフライン時の処理
+                setUpSaveButton(null, lat, lng);
+            }
+
+            // 保存ボタンの設定
+            function setUpSaveButton(address, lat, lng) {
+                document.getElementById('saveButton').addEventListener('click', function() {
+                    const memo = document.getElementById('memo').value;
+                    const row = document.createElement('tr');
+                    const timeCell = document.createElement('td');
+                    const addressCell = document.createElement('td');
+                    const memoCell = document.createElement('td');
+                    const updateCell = document.createElement('td');
+                    const deleteCell = document.createElement('td');
+                    const updateButton = document.createElement('button');
+                    const deleteButton = document.createElement('button');
+
+                    const now = new Date();
+                    const formattedTime = `${now.getFullYear()}年${(now.getMonth() +1).toString().padStart(2, '0')}月${now.getDate().toString().padStart(2, '0')}日${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+                    timeCell.textContent = formattedTime;
+                    addressCell.textContent = address || '未取得';
+                    memoCell.textContent = memo;
+                    updateButton.textContent = '更新';
+                    deleteButton.textContent = '削除';
+
+                    updateButton.addEventListener('click', function() {
+                        const endpoint = 'https://nominatim.openstreetmap.org/reverse';
+                        const params = new URLSearchParams({
+                            lat: lat,
+                            lon: lng,
+                            format: 'json',
+                            'accept-language': 'ja'
+                        });
+
+                        const url = `${endpoint}?${params.toString()}`;
+
+                        fetch(url)
+                            .then(response => response.json())
+                            .then(data => {
+                                const newAddress = data.display_name;
+                                addressCell.textContent = newAddress;
+
+                                // localStorageの該当データを更新
+                                const savedData = JSON.parse(localStorage.getItem('historyData')) || [];
+                                for (let item of savedData) {
+                                    if (item.time === formattedTime && item.memo === memo) {
+                                        item.address = newAddress;
+                                        break;
+                                    }
+                                }
+                                localStorage.setItem('historyData', JSON.stringify(savedData));
+                            })
+                            .catch(error => {
+                                console.error('エラー:', error);
+                                alert('住所の更新に失敗しました。');
+                            });
+                    });
+
+                    deleteButton.addEventListener('click', function() {
+                        historyTableBody.removeChild(row);
+                        const savedData = JSON.parse(localStorage.getItem('historyData')) || [];
+                        const updatedData = savedData.filter(item => !(item.time === formattedTime && item.memo === memo));
+                        localStorage.setItem('historyData', JSON.stringify(updatedData));
+                    });
+
+                    updateCell.appendChild(updateButton);
+                    deleteCell.appendChild(deleteButton);
+                    row.appendChild(timeCell);
+                    row.appendChild(addressCell);
+                    row.appendChild(memoCell);
+                    row.appendChild(updateCell);
+                    row.appendChild(deleteCell);
+                    historyTableBody.insertBefore(row, historyTableBody.firstChild);
+
+                    const savedData = JSON.parse(localStorage.getItem('historyData')) || [];
+                    savedData.push({ time: formattedTime, lng, lat, address, memo });
+                    localStorage.setItem('historyData', JSON.stringify(savedData));
+                });
+            }
+
+            // localStorageからデータを読み込む
+            const savedData = JSON.parse(localStorage.getItem('historyData')) || [];
+            savedData.forEach(item => {
+                const row = document.createElement('tr');
+                const timeCell = document.createElement('td');
+                const addressCell = document.createElement('td');
+                const memoCell = document.createElement('td');
+                const updateCell = document.createElement('td');
+                const deleteCell = document.createElement('td');
+                const updateButton = document.createElement('button');
+                const deleteButton = document.createElement('button');
+
+                timeCell.textContent = item.time || 'N/A';
+                addressCell.textContent = item.address || '未取得';
+                memoCell.textContent = item.memo || 'N/A';
+                updateButton.textContent = '更新';
+                deleteButton.textContent = '削除';
+
+                updateButton.addEventListener('click', function() {
+                    const endpoint = 'https://nominatim.openstreetmap.org/reverse';
+                    const params = new URLSearchParams({
+                        lat: item.lat,
+                        lon: item.lng,
+                        format: 'json',
+                        'accept-language': 'ja'
+                    });
+
+                    const url = `${endpoint}?${params.toString()}`;
+
+                    fetch(url)
+                        .then(response => response.json())
+                        .then(data => {
+                            const newAddress = data.display_name;
+                            addressCell.textContent = newAddress;
+
+                            // localStorageの該当データを更新
+                            for (let dataItem of savedData) {
+                                if (dataItem.time === item.time && dataItem.memo === item.memo) {
+                                    dataItem.address = newAddress;
+                                    break;
+                                }
+                            }
+                            localStorage.setItem('historyData', JSON.stringify(savedData));
+                        })
+                        .catch(error => {
+                            console.error('エラー:', error);
+                            alert('住所の更新に失敗しました。');
+                        });
+                });
+
+                deleteButton.addEventListener('click', function() {
+                    historyTableBody.removeChild(row);
+                    const updatedData = savedData.filter(data => !(data.time === item.time && data.memo === item.memo));
+                    localStorage.setItem('historyData', JSON.stringify(updatedData));
+                });
+
+                updateCell.appendChild(updateButton);
+                deleteCell.appendChild(deleteButton);
+                row.appendChild(timeCell);
+                row.appendChild(addressCell);
+                row.appendChild(memoCell);
+                row.appendChild(updateCell);
+                row.appendChild(deleteCell);
+                historyTableBody.appendChild(row);
+            });
+        }
+
+        function errorCallback(error) {
+            document.getElementById('address').textContent = '位置情報の取得に失敗しました。';
+        }
+
+        // JSONをCSVに変換する関数
+        function jsonToCsv(jsonData) {
+            const csvRows = [];
+            const headers = Object.keys(jsonData[0]);
+            csvRows.push(headers.join(','));
+
+            jsonData.forEach(item => {
+                const values = headers.map(header => {
+                    const escaped = ('' + item[header]).replace(/"/g, '\\"');
+                    return `"${escaped}"`;
+                });
+                csvRows.push(values.join(','));
+            });
+
+            return csvRows.join('\n');
+        }
+
+        // エクスポートボタンのイベントリスナー
+        document.getElementById('exportButton').addEventListener('click', function() {
+            const savedData = JSON.parse(localStorage.getItem('historyData')) || [];
+            const csvData = jsonToCsv(savedData);
+            const blob = new Blob([csvData], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'historyData.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
