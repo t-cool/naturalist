@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main  # デプロイをトリガーするブランチを指定
+      - main
 
 jobs:
   build:
@@ -16,7 +16,8 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          flutter-version: '3.10.5'
+          channel: 'stable'
 
       - name: Install dependencies
         run: flutter pub get
